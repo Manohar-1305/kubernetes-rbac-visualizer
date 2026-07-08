@@ -1,197 +1,377 @@
-from models import GraphNode, GraphEdge, GraphResponse
+from typing import Dict, List
 
 
-class RBACGraphBuilder:
+class RBACGraph:
 
-    def __init__(self, data):
-        self.data = data
-        self.nodes = {}
-        self.edges = []
+    # -------------------------------------------------------
+    # User Graph
+    # -------------------------------------------------------
 
-    # -------------------------------------------------------------
-    # Public
-    # -------------------------------------------------------------
+    @staticmethod
+    def user(user: Dict):
 
-    def build(self) -> GraphResponse:
+        nodes = []
+        edges = []
 
-        self._add_roles()
-        self._add_cluster_roles()
-        self._add_role_bindings()
-        self._add_cluster_role_bindings()
-        self._connect_role_bindings()
-        self._connect_cluster_role_bindings()
+        user_id = f"user:{user['name']}"
 
-        return GraphResponse(
-            nodes=list(self.nodes.values()),
-            edges=self.edges,
+        nodes.append(
+            {
+                "id": user_id,
+                "label": user["name"],
+                "type": "User"
+            }
         )
 
-    # -------------------------------------------------------------
-    # Node Helpers
-    # -------------------------------------------------------------
+        for rb in user.get("roleBindings", []):
 
-    def _node_id(self, kind, namespace, name):
+            rb_id = f"rb:{rb['namespace']}:{rb['name']}"
 
-        namespace = namespace or "cluster"
-        return f"{kind}:{namespace}:{name}"
-
-    def _add_node(self, kind, name, namespace=None):
-
-        node_id = self._node_id(kind, namespace, name)
-
-        if node_id not in self.nodes:
-            self.nodes[node_id] = GraphNode(
-                id=node_id,
-                label=name,
-                kind=kind,
-                namespace=namespace,
+            nodes.append(
+                {
+                    "id": rb_id,
+                    "label": rb["name"],
+                    "type": "RoleBinding"
+                }
             )
 
-        return node_id
-
-    def _add_edge(self, source, target, relation):
-
-        self.edges.append(
-            GraphEdge(
-                source=source,
-                target=target,
-                relation=relation,
+            edges.append(
+                {
+                    "source": user_id,
+                    "target": rb_id
+                }
             )
+
+            role_id = f"{rb['kind']}:{rb['role']}"
+
+            nodes.append(
+                {
+                    "id": role_id,
+                    "label": rb["role"],
+                    "type": rb["kind"]
+                }
+            )
+
+            edges.append(
+                {
+                    "source": rb_id,
+                    "target": role_id
+                }
+            )
+
+        for crb in user.get("clusterRoleBindings", []):
+
+            crb_id = f"crb:{crb['name']}"
+
+            nodes.append(
+                {
+                    "id": crb_id,
+                    "label": crb["name"],
+                    "type": "ClusterRoleBinding"
+                }
+            )
+
+            edges.append(
+                {
+                    "source": user_id,
+                    "target": crb_id
+                }
+            )
+
+            role_id = f"ClusterRole:{crb['role']}"
+
+            nodes.append(
+                {
+                    "id": role_id,
+                    "label": crb["role"],
+                    "type": "ClusterRole"
+                }
+            )
+
+            edges.append(
+                {
+                    "source": crb_id,
+                    "target": role_id
+                }
+            )
+
+        return {
+            "nodes": RBACGraph.unique(nodes),
+            "edges": RBACGraph.unique(edges)
+        }
+
+    # -------------------------------------------------------
+    # Service Account Graph
+    # -------------------------------------------------------
+
+    @staticmethod
+    def service_account(name, namespace, rolebindings, clusterrolebindings):
+
+        nodes = []
+        edges = []
+
+        sa_id = f"sa:{namespace}:{name}"
+
+        nodes.append(
+            {
+                "id": sa_id,
+                "label": name,
+                "type": "ServiceAccount"
+            }
         )
 
-    # -------------------------------------------------------------
-    # Roles
-    # -------------------------------------------------------------
+        for rb in rolebindings:
 
-    def _add_roles(self):
+            for s in rb.get("subjects", []):
 
-        for role in self.data["roles"]:
-            self._add_node(
-                kind="Role",
-                name=role.metadata.name,
-                namespace=role.metadata.namespace,
+                if s["kind"] != "ServiceAccount":
+                    continue
+
+                if s["name"] != name:
+                    continue
+
+                if s.get("namespace", namespace) != namespace:
+                    continue
+
+                rb_id = f"rb:{rb['namespace']}:{rb['name']}"
+
+                nodes.append(
+                    {
+                        "id": rb_id,
+                        "label": rb["name"],
+                        "type": "RoleBinding"
+                    }
+                )
+
+                edges.append(
+                    {
+                        "source": sa_id,
+                        "target": rb_id
+                    }
+                )
+
+                role_id = f"{rb['kind']}:{rb['role']}"
+
+                nodes.append(
+                    {
+                        "id": role_id,
+                        "label": rb["role"],
+                        "type": rb["kind"]
+                    }
+                )
+
+                edges.append(
+                    {
+                        "source": rb_id,
+                        "target": role_id
+                    }
+                )
+
+        for crb in clusterrolebindings:
+
+            for s in crb.get("subjects", []):
+
+                if s["kind"] != "ServiceAccount":
+                    continue
+
+                if s["name"] != name:
+                    continue
+
+                if s.get("namespace", namespace) != namespace:
+                    continue
+
+                crb_id = f"crb:{crb['name']}"
+
+                nodes.append(
+                    {
+                        "id": crb_id,
+                        "label": crb["name"],
+                        "type": "ClusterRoleBinding"
+                    }
+                )
+
+                edges.append(
+                    {
+                        "source": sa_id,
+                        "target": crb_id
+                    }
+                )
+
+                role_id = f"ClusterRole:{crb['role']}"
+
+                nodes.append(
+                    {
+                        "id": role_id,
+                        "label": crb["role"],
+                        "type": "ClusterRole"
+                    }
+                )
+
+                edges.append(
+                    {
+                        "source": crb_id,
+                        "target": role_id
+                    }
+                )
+
+        return {
+            "nodes": RBACGraph.unique(nodes),
+            "edges": RBACGraph.unique(edges)
+        }
+    # -------------------------------------------------------
+    # Role Graph
+    # -------------------------------------------------------
+
+    @staticmethod
+    def role(role, rolebindings):
+
+        nodes = []
+        edges = []
+
+        role_id = f"Role:{role['namespace']}:{role['name']}"
+
+        nodes.append(
+            {
+                "id": role_id,
+                "label": role["name"],
+                "type": "Role"
+            }
+        )
+
+        for rb in rolebindings:
+
+            if rb["role"] != role["name"]:
+                continue
+
+            if rb["namespace"] != role["namespace"]:
+                continue
+
+            rb_id = f"rb:{rb['namespace']}:{rb['name']}"
+
+            nodes.append(
+                {
+                    "id": rb_id,
+                    "label": rb["name"],
+                    "type": "RoleBinding"
+                }
             )
 
-    # -------------------------------------------------------------
-    # ClusterRoles
-    # -------------------------------------------------------------
-
-    def _add_cluster_roles(self):
-
-        for role in self.data["cluster_roles"]:
-            self._add_node(
-                kind="ClusterRole",
-                name=role.metadata.name,
+            edges.append(
+                {
+                    "source": rb_id,
+                    "target": role_id
+                }
             )
 
-    # -------------------------------------------------------------
-    # RoleBindings
-    # -------------------------------------------------------------
+            for s in rb.get("subjects", []):
 
-    def _add_role_bindings(self):
+                subject_id = f"{s['kind']}:{s['name']}"
 
-        for rb in self.data["role_bindings"]:
-            rb_node = self._add_node(
-                kind="RoleBinding",
-                name=rb.metadata.name,
-                namespace=rb.metadata.namespace,
+                nodes.append(
+                    {
+                        "id": subject_id,
+                        "label": s["name"],
+                        "type": s["kind"]
+                    }
+                )
+
+                edges.append(
+                    {
+                        "source": subject_id,
+                        "target": rb_id
+                    }
+                )
+
+        return {
+            "nodes": RBACGraph.unique(nodes),
+            "edges": RBACGraph.unique(edges)
+        }
+
+    # -------------------------------------------------------
+    # ClusterRole Graph
+    # -------------------------------------------------------
+
+    @staticmethod
+    def cluster_role(role, bindings):
+
+        nodes = []
+        edges = []
+
+        role_id = f"ClusterRole:{role['name']}"
+
+        nodes.append(
+            {
+                "id": role_id,
+                "label": role["name"],
+                "type": "ClusterRole"
+            }
+        )
+
+        for crb in bindings:
+
+            if crb["role"] != role["name"]:
+                continue
+
+            crb_id = f"crb:{crb['name']}"
+
+            nodes.append(
+                {
+                    "id": crb_id,
+                    "label": crb["name"],
+                    "type": "ClusterRoleBinding"
+                }
             )
 
-            if rb.subjects:
-                for subject in rb.subjects:
-
-                    subject_node = self._add_node(
-                        kind=subject.kind,
-                        name=subject.name,
-                        namespace=getattr(subject, "namespace", None),
-                    )
-
-                    self._add_edge(
-                        source=subject_node,
-                        target=rb_node,
-                        relation="BOUND_TO",
-                    )
-
-    # -------------------------------------------------------------
-    # ClusterRoleBindings
-    # -------------------------------------------------------------
-
-    def _add_cluster_role_bindings(self):
-
-        for crb in self.data["cluster_role_bindings"]:
-
-            crb_node = self._add_node(
-                kind="ClusterRoleBinding",
-                name=crb.metadata.name,
+            edges.append(
+                {
+                    "source": crb_id,
+                    "target": role_id
+                }
             )
 
-            if crb.subjects:
-                for subject in crb.subjects:
+            for s in crb.get("subjects", []):
 
-                    subject_node = self._add_node(
-                        kind=subject.kind,
-                        name=subject.name,
-                        namespace=getattr(subject, "namespace", None),
-                    )
+                subject_id = f"{s['kind']}:{s['name']}"
 
-                    self._add_edge(
-                        source=subject_node,
-                        target=crb_node,
-                        relation="BOUND_TO",
-                    )
+                nodes.append(
+                    {
+                        "id": subject_id,
+                        "label": s["name"],
+                        "type": s["kind"]
+                    }
+                )
 
-    # -------------------------------------------------------------
-    # Connect RoleBinding -> Role
-    # -------------------------------------------------------------
+                edges.append(
+                    {
+                        "source": subject_id,
+                        "target": crb_id
+                    }
+                )
 
-    def _connect_role_bindings(self):
+        return {
+            "nodes": RBACGraph.unique(nodes),
+            "edges": RBACGraph.unique(edges)
+        }
+    # -------------------------------------------------------
+    # Remove duplicates
+    # -------------------------------------------------------
 
-        for rb in self.data["role_bindings"]:
+    @staticmethod
+    def unique(items: List[Dict]):
 
-            rb_node = self._node_id(
-                "RoleBinding",
-                rb.metadata.namespace,
-                rb.metadata.name,
-            )
+        unique_items = []
 
-            ref = rb.role_ref
+        seen = set()
 
-            target = self._node_id(
-                ref.kind,
-                rb.metadata.namespace if ref.kind == "Role" else None,
-                ref.name,
-            )
+        for item in items:
 
-            self._add_edge(
-                source=rb_node,
-                target=target,
-                relation="GRANTS",
-            )
+            key = tuple(sorted(item.items()))
 
-    # -------------------------------------------------------------
-    # Connect ClusterRoleBinding -> ClusterRole
-    # -------------------------------------------------------------
+            if key in seen:
+                continue
 
-    def _connect_cluster_role_bindings(self):
+            seen.add(key)
 
-        for crb in self.data["cluster_role_bindings"]:
+            unique_items.append(item)
 
-            crb_node = self._node_id(
-                "ClusterRoleBinding",
-                None,
-                crb.metadata.name,
-            )
-
-            ref = crb.role_ref
-
-            target = self._node_id(
-                ref.kind,
-                None,
-                ref.name,
-            )
-
-            self._add_edge(
-                source=crb_node,
-                target=target,
-                relation="GRANTS",
-            )
+        return unique_items
