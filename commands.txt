@@ -12,3 +12,20 @@ kubectl apply -f service.yaml
 
 docker save -o rbac-visualizer.tar rbac-visualizer:1.0
 sudo ctr -n k8s.io images import rbac-visualizer.tar
+
+
+docker build -t rbac-visualizer:1.0 .
+# Save image
+docker save -o rbac-visualizer.tar rbac-visualizer:1.0
+
+# Import into containerd
+sudo ctr -n k8s.io images import rbac-visualizer.tar
+
+# Verify
+sudo ctr -n k8s.io images ls | grep rbac
+
+# Delete old deployment
+kubectl delete deployment rbac-visualizer
+
+# Apply new deployment
+kubectl apply -f deployment.yaml
