@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rbac-visualizer
+  namespace: default
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: rbac-visualizer
+
+  template:
+    metadata:
+      labels:
+        app: rbac-visualizer
+
+    spec:
+      serviceAccountName: rbac-visualizer
+
+      containers:
+      - name: rbac-visualizer
+
+        image: manoharshetty507/rbac-visualizer:latest
+
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 8000
