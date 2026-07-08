@@ -9,3 +9,6 @@ kubectl apply -f clusterrole.yaml
 kubectl apply -f clusterrolebinding.yaml
 kubectl apply -f deployment.yaml
 kubectl apply -f service.yaml
+
+docker save -o rbac-visualizer.tar rbac-visualizer:1.0
+sudo ctr -n k8s.io images import rbac-visualizer.tar
