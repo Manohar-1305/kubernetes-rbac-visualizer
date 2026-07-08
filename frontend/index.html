@@ -3,30 +3,79 @@
   <head>
     <meta charset="UTF-8" />
 
-    <title>RBAC Visualizer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <link rel="stylesheet" href="/static/style.css" />
+    <title>Kubernetes RBAC Visualizer</title>
+
+    <link rel="stylesheet" href="style.css" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
 
     <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
   </head>
 
   <body>
-    <div class="header">
-      <h1>RBAC Visualizer</h1>
+    <header>
+      <div class="title">
+        <h1>Kubernetes RBAC Visualizer</h1>
 
-      <button onclick="loadGraph()">Refresh</button>
+        <p>Visualize Kubernetes RBAC Relationships</p>
+      </div>
+
+      <div class="header-right">
+        <input type="text" id="search" placeholder="Search..." />
+
+        <button id="refresh">Refresh</button>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="users">Users</button>
+
+      <button class="tab" data-tab="groups">Groups</button>
+
+      <button class="tab" data-tab="serviceaccounts">Service Accounts</button>
+
+      <button class="tab" data-tab="roles">Roles</button>
+
+      <button class="tab" data-tab="clusterroles">Cluster Roles</button>
+
+      <button class="tab" data-tab="rolebindings">RoleBindings</button>
+
+      <button class="tab" data-tab="clusterrolebindings">
+        ClusterRoleBindings
+      </button>
     </div>
 
     <div class="container">
-      <div id="cy"></div>
-
       <div class="sidebar">
+        <h2 id="listTitle">Users</h2>
+
+        <ul id="objectList"></ul>
+      </div>
+
+      <div class="graph-panel">
+        <div class="graph-header">
+          <h2>Relationship Graph</h2>
+        </div>
+
+        <div id="graph"></div>
+      </div>
+
+      <div class="details">
         <h2>Details</h2>
 
-        <div id="details">Click a node...</div>
+        <div id="details">Select an object.</div>
       </div>
     </div>
 
-    <script src="/static/app.js"></script>
+    <script src="app.js"></script>
   </body>
 </html>
