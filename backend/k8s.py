@@ -25,7 +25,7 @@ class KubernetesRBAC:
             "resources": list(rule.resources or []),
             "verbs": list(rule.verbs or []),
             "resourceNames": list(rule.resource_names or []),
-            "nonResourceURLs": list(rule.non_resource_urls or [])
+            "nonResourceURLs": list(getattr(rule, "non_resource_ur_ls", []) or [])
         }
 
     def _get_role(self, namespace, name):

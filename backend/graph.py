@@ -4,6 +4,27 @@ from typing import Dict, List
 class RBACGraph:
 
     # -------------------------------------------------------
+    # Helpers
+    # -------------------------------------------------------
+
+    @staticmethod
+    def _node(node_id, label, node_type):
+
+        return {
+            "id": node_id,
+            "label": label,
+            "type": node_type
+        }
+
+    @staticmethod
+    def _edge(source, target):
+
+        return {
+            "source": source,
+            "target": target
+        }
+
+    # -------------------------------------------------------
     # User Graph
     # -------------------------------------------------------
 
@@ -16,11 +37,11 @@ class RBACGraph:
         user_id = f"user:{user['name']}"
 
         nodes.append(
-            {
-                "id": user_id,
-                "label": user["name"],
-                "type": "User"
-            }
+            RBACGraph._node(
+                user_id,
+                user["name"],
+                "User"
+            )
         )
 
         for rb in user.get("roleBindings", []):
@@ -28,35 +49,35 @@ class RBACGraph:
             rb_id = f"rb:{rb['namespace']}:{rb['name']}"
 
             nodes.append(
-                {
-                    "id": rb_id,
-                    "label": rb["name"],
-                    "type": "RoleBinding"
-                }
+                RBACGraph._node(
+                    rb_id,
+                    rb["name"],
+                    "RoleBinding"
+                )
             )
 
             edges.append(
-                {
-                    "source": user_id,
-                    "target": rb_id
-                }
+                RBACGraph._edge(
+                    user_id,
+                    rb_id
+                )
             )
 
             role_id = f"{rb['kind']}:{rb['role']}"
 
             nodes.append(
-                {
-                    "id": role_id,
-                    "label": rb["role"],
-                    "type": rb["kind"]
-                }
+                RBACGraph._node(
+                    role_id,
+                    rb["role"],
+                    rb["kind"]
+                )
             )
 
             edges.append(
-                {
-                    "source": rb_id,
-                    "target": role_id
-                }
+                RBACGraph._edge(
+                    rb_id,
+                    role_id
+                )
             )
 
         for crb in user.get("clusterRoleBindings", []):
@@ -64,42 +85,41 @@ class RBACGraph:
             crb_id = f"crb:{crb['name']}"
 
             nodes.append(
-                {
-                    "id": crb_id,
-                    "label": crb["name"],
-                    "type": "ClusterRoleBinding"
-                }
+                RBACGraph._node(
+                    crb_id,
+                    crb["name"],
+                    "ClusterRoleBinding"
+                )
             )
 
             edges.append(
-                {
-                    "source": user_id,
-                    "target": crb_id
-                }
+                RBACGraph._edge(
+                    user_id,
+                    crb_id
+                )
             )
 
             role_id = f"ClusterRole:{crb['role']}"
 
             nodes.append(
-                {
-                    "id": role_id,
-                    "label": crb["role"],
-                    "type": "ClusterRole"
-                }
+                RBACGraph._node(
+                    role_id,
+                    crb["role"],
+                    "ClusterRole"
+                )
             )
 
             edges.append(
-                {
-                    "source": crb_id,
-                    "target": role_id
-                }
+                RBACGraph._edge(
+                    crb_id,
+                    role_id
+                )
             )
 
         return {
             "nodes": RBACGraph.unique(nodes),
             "edges": RBACGraph.unique(edges)
         }
-
     # -------------------------------------------------------
     # Service Account Graph
     # -------------------------------------------------------
@@ -113,105 +133,105 @@ class RBACGraph:
         sa_id = f"sa:{namespace}:{name}"
 
         nodes.append(
-            {
-                "id": sa_id,
-                "label": name,
-                "type": "ServiceAccount"
-            }
+            RBACGraph._node(
+                sa_id,
+                name,
+                "ServiceAccount"
+            )
         )
 
         for rb in rolebindings:
 
-            for s in rb.get("subjects", []):
+            for subject in rb.get("subjects", []):
 
-                if s["kind"] != "ServiceAccount":
+                if subject["kind"] != "ServiceAccount":
                     continue
 
-                if s["name"] != name:
+                if subject["name"] != name:
                     continue
 
-                if s.get("namespace", namespace) != namespace:
+                if subject.get("namespace") != namespace:
                     continue
 
                 rb_id = f"rb:{rb['namespace']}:{rb['name']}"
 
                 nodes.append(
-                    {
-                        "id": rb_id,
-                        "label": rb["name"],
-                        "type": "RoleBinding"
-                    }
+                    RBACGraph._node(
+                        rb_id,
+                        rb["name"],
+                        "RoleBinding"
+                    )
                 )
 
                 edges.append(
-                    {
-                        "source": sa_id,
-                        "target": rb_id
-                    }
+                    RBACGraph._edge(
+                        sa_id,
+                        rb_id
+                    )
                 )
 
                 role_id = f"{rb['kind']}:{rb['role']}"
 
                 nodes.append(
-                    {
-                        "id": role_id,
-                        "label": rb["role"],
-                        "type": rb["kind"]
-                    }
+                    RBACGraph._node(
+                        role_id,
+                        rb["role"],
+                        rb["kind"]
+                    )
                 )
 
                 edges.append(
-                    {
-                        "source": rb_id,
-                        "target": role_id
-                    }
+                    RBACGraph._edge(
+                        rb_id,
+                        role_id
+                    )
                 )
 
         for crb in clusterrolebindings:
 
-            for s in crb.get("subjects", []):
+            for subject in crb.get("subjects", []):
 
-                if s["kind"] != "ServiceAccount":
+                if subject["kind"] != "ServiceAccount":
                     continue
 
-                if s["name"] != name:
+                if subject["name"] != name:
                     continue
 
-                if s.get("namespace", namespace) != namespace:
+                if subject.get("namespace") != namespace:
                     continue
 
                 crb_id = f"crb:{crb['name']}"
 
                 nodes.append(
-                    {
-                        "id": crb_id,
-                        "label": crb["name"],
-                        "type": "ClusterRoleBinding"
-                    }
+                    RBACGraph._node(
+                        crb_id,
+                        crb["name"],
+                        "ClusterRoleBinding"
+                    )
                 )
 
                 edges.append(
-                    {
-                        "source": sa_id,
-                        "target": crb_id
-                    }
+                    RBACGraph._edge(
+                        sa_id,
+                        crb_id
+                    )
                 )
 
                 role_id = f"ClusterRole:{crb['role']}"
 
                 nodes.append(
-                    {
-                        "id": role_id,
-                        "label": crb["role"],
-                        "type": "ClusterRole"
-                    }
+                    RBACGraph._node(
+                        role_id,
+                        crb["role"],
+                        "ClusterRole"
+                    )
                 )
 
                 edges.append(
-                    {
-                        "source": crb_id,
-                        "target": role_id
-                    }
+                    RBACGraph._edge(
+                        crb_id,
+                        role_id
+                    )
                 )
 
         return {
@@ -231,14 +251,17 @@ class RBACGraph:
         role_id = f"Role:{role['namespace']}:{role['name']}"
 
         nodes.append(
-            {
-                "id": role_id,
-                "label": role["name"],
-                "type": "Role"
-            }
+            RBACGraph._node(
+                role_id,
+                role["name"],
+                "Role"
+            )
         )
 
         for rb in rolebindings:
+
+            if rb["kind"] != "Role":
+                continue
 
             if rb["role"] != role["name"]:
                 continue
@@ -249,37 +272,50 @@ class RBACGraph:
             rb_id = f"rb:{rb['namespace']}:{rb['name']}"
 
             nodes.append(
-                {
-                    "id": rb_id,
-                    "label": rb["name"],
-                    "type": "RoleBinding"
-                }
+                RBACGraph._node(
+                    rb_id,
+                    rb["name"],
+                    "RoleBinding"
+                )
             )
 
             edges.append(
-                {
-                    "source": rb_id,
-                    "target": role_id
-                }
+                RBACGraph._edge(
+                    rb_id,
+                    role_id
+                )
             )
 
-            for s in rb.get("subjects", []):
+            for subject in rb.get("subjects", []):
 
-                subject_id = f"{s['kind']}:{s['name']}"
+                if subject["kind"] == "ServiceAccount":
+
+                    subject_id = (
+                        f"ServiceAccount:"
+                        f"{subject.get('namespace','default')}:"
+                        f"{subject['name']}"
+                    )
+
+                else:
+
+                    subject_id = (
+                        f"{subject['kind']}:"
+                        f"{subject['name']}"
+                    )
 
                 nodes.append(
-                    {
-                        "id": subject_id,
-                        "label": s["name"],
-                        "type": s["kind"]
-                    }
+                    RBACGraph._node(
+                        subject_id,
+                        subject["name"],
+                        subject["kind"]
+                    )
                 )
 
                 edges.append(
-                    {
-                        "source": subject_id,
-                        "target": rb_id
-                    }
+                    RBACGraph._edge(
+                        subject_id,
+                        rb_id
+                    )
                 )
 
         return {
@@ -300,13 +336,12 @@ class RBACGraph:
         role_id = f"ClusterRole:{role['name']}"
 
         nodes.append(
-            {
-                "id": role_id,
-                "label": role["name"],
-                "type": "ClusterRole"
-            }
+            RBACGraph._node(
+                role_id,
+                role["name"],
+                "ClusterRole"
+            )
         )
-
         for crb in bindings:
 
             if crb["role"] != role["name"]:
@@ -315,43 +350,57 @@ class RBACGraph:
             crb_id = f"crb:{crb['name']}"
 
             nodes.append(
-                {
-                    "id": crb_id,
-                    "label": crb["name"],
-                    "type": "ClusterRoleBinding"
-                }
+                RBACGraph._node(
+                    crb_id,
+                    crb["name"],
+                    "ClusterRoleBinding"
+                )
             )
 
             edges.append(
-                {
-                    "source": crb_id,
-                    "target": role_id
-                }
+                RBACGraph._edge(
+                    crb_id,
+                    role_id
+                )
             )
 
-            for s in crb.get("subjects", []):
+            for subject in crb.get("subjects", []):
 
-                subject_id = f"{s['kind']}:{s['name']}"
+                if subject["kind"] == "ServiceAccount":
+
+                    subject_id = (
+                        f"ServiceAccount:"
+                        f"{subject.get('namespace','default')}:"
+                        f"{subject['name']}"
+                    )
+
+                else:
+
+                    subject_id = (
+                        f"{subject['kind']}:"
+                        f"{subject['name']}"
+                    )
 
                 nodes.append(
-                    {
-                        "id": subject_id,
-                        "label": s["name"],
-                        "type": s["kind"]
-                    }
+                    RBACGraph._node(
+                        subject_id,
+                        subject["name"],
+                        subject["kind"]
+                    )
                 )
 
                 edges.append(
-                    {
-                        "source": subject_id,
-                        "target": crb_id
-                    }
+                    RBACGraph._edge(
+                        subject_id,
+                        crb_id
+                    )
                 )
 
         return {
             "nodes": RBACGraph.unique(nodes),
             "edges": RBACGraph.unique(edges)
         }
+
     # -------------------------------------------------------
     # Remove duplicates
     # -------------------------------------------------------
@@ -359,7 +408,7 @@ class RBACGraph:
     @staticmethod
     def unique(items: List[Dict]):
 
-        unique_items = []
+        result = []
 
         seen = set()
 
@@ -372,6 +421,6 @@ class RBACGraph:
 
             seen.add(key)
 
-            unique_items.append(item)
+            result.append(item)
 
-        return unique_items
+        return result

@@ -42,6 +42,10 @@ tabs.forEach((tab) => {
 
     title.innerText = tab.innerText;
 
+    search.value = "";
+
+    destroyGraph();
+
     loadTab(currentTab);
   };
 });
@@ -53,45 +57,60 @@ tabs.forEach((tab) => {
 search.onkeyup = () => {
   const value = search.value.toLowerCase();
 
-  const items = objectList.querySelectorAll("li");
-
-  items.forEach((item) => {
-    if (item.innerText.toLowerCase().includes(value)) {
-      item.style.display = "block";
-    } else {
-      item.style.display = "none";
-    }
+  document.querySelectorAll("#objectList li").forEach((li) => {
+    li.style.display = li.innerText.toLowerCase().includes(value)
+      ? "block"
+      : "none";
   });
 };
+
+// ----------------------------------------------------
+// Destroy Graph
+// ----------------------------------------------------
+
+function destroyGraph() {
+  if (graph) {
+    graph.destroy();
+
+    graph = null;
+  }
+
+  document.getElementById("graph").innerHTML = "";
+}
 
 // ----------------------------------------------------
 // Load Tab
 // ----------------------------------------------------
 
 async function loadTab(tab) {
-  details.innerHTML = "Loading...";
-
   objectList.innerHTML = "";
+
+  details.innerHTML = "Loading...";
 
   destroyGraph();
 
-  let endpoint = "/api/" + tab;
+  const endpoint = "/api/" + tab;
+
+  let data;
 
   if (cache[endpoint]) {
-    renderList(tab, cache[endpoint]);
+    data = cache[endpoint];
+  } else {
+    try {
+      const response = await fetch(api + endpoint);
 
-    return;
+      data = await response.json();
+
+      cache[endpoint] = data;
+    } catch {
+      details.innerHTML = "<h3>Unable to contact backend.</h3>";
+
+      return;
+    }
   }
-
-  const response = await fetch(api + endpoint);
-
-  const data = await response.json();
-
-  cache[endpoint] = data;
 
   renderList(tab, data);
 }
-
 // ----------------------------------------------------
 // Render List
 // ----------------------------------------------------
@@ -100,6 +119,12 @@ function renderList(tab, data) {
   objectList.innerHTML = "";
 
   details.innerHTML = "Select an object.";
+
+  if (!Array.isArray(data) || data.length === 0) {
+    objectList.innerHTML = "<li>No objects found.</li>";
+
+    return;
+  }
 
   data.forEach((item) => {
     const li = document.createElement("li");
@@ -125,32 +150,23 @@ function renderList(tab, data) {
 }
 
 // ----------------------------------------------------
-// Destroy Graph
-// ----------------------------------------------------
-
-function destroyGraph() {
-  if (graph) {
-    graph.destroy();
-
-    graph = null;
-  }
-
-  document.getElementById("graph").innerHTML = "";
-}
-// ----------------------------------------------------
 // Load Details
 // ----------------------------------------------------
 
 async function loadDetails(tab, item) {
+  destroyGraph();
+
   let endpoint = "";
 
   switch (tab) {
     case "users":
       endpoint = "/api/user/" + encodeURIComponent(item.name);
+
       break;
 
     case "groups":
       endpoint = "/api/group/" + encodeURIComponent(item.name);
+
       break;
 
     case "serviceaccounts":
@@ -159,6 +175,7 @@ async function loadDetails(tab, item) {
         encodeURIComponent(item.namespace) +
         "/" +
         encodeURIComponent(item.name);
+
       break;
 
     case "roles":
@@ -167,18 +184,22 @@ async function loadDetails(tab, item) {
         encodeURIComponent(item.namespace) +
         "/" +
         encodeURIComponent(item.name);
+
       break;
 
     case "clusterroles":
       endpoint = "/api/clusterrole/" + encodeURIComponent(item.name);
+
       break;
 
     case "rolebindings":
       showRoleBinding(item);
+
       return;
 
     case "clusterrolebindings":
       showClusterRoleBinding(item);
+
       return;
 
     default:
@@ -191,11 +212,10 @@ async function loadDetails(tab, item) {
 
   renderDetails(tab, data);
 
-  if (data.graph) {
+  if (data.graph && data.graph.nodes && data.graph.nodes.length > 0) {
     renderGraph(data.graph);
   }
 }
-
 // ----------------------------------------------------
 // Render Details
 // ----------------------------------------------------
@@ -203,39 +223,43 @@ async function loadDetails(tab, item) {
 function renderDetails(tab, data) {
   details.innerHTML = "";
 
-  const card = document.createElement("div");
-
-  card.className = "card";
-
-  let obj = data.details || data.user || data.role || data.clusterRole;
+  const obj = data.details || data.user || data.role || data.clusterRole;
 
   if (!obj) {
-    details.innerHTML = "<h3>No data available</h3>";
+    details.innerHTML = "<h3>No details available.</h3>";
 
     return;
   }
 
+  // ----------------------------------------------------
+  // Basic Information
+  // ----------------------------------------------------
+
+  const info = document.createElement("div");
+
+  info.className = "card";
+
   let html = "";
 
-  html += "<h3>" + obj.name + "</h3>";
+  html += `<h3>${obj.name}</h3>`;
 
   if (obj.namespace) {
-    html += "<p><b>Namespace:</b> " + obj.namespace + "</p>";
+    html += `<p><b>Namespace:</b> ${obj.namespace}</p>`;
   }
 
   if (obj.kind) {
-    html += "<p><b>Kind:</b> " + obj.kind + "</p>";
+    html += `<p><b>Kind:</b> ${obj.kind}</p>`;
   }
 
-  card.innerHTML = html;
+  info.innerHTML = html;
 
-  details.appendChild(card);
+  details.appendChild(info);
 
   // ----------------------------------------------------
   // Permissions
   // ----------------------------------------------------
 
-  if (obj.permissions) {
+  if (obj.permissions && obj.permissions.length > 0) {
     const permissionCard = document.createElement("div");
 
     permissionCard.className = "card";
@@ -247,27 +271,37 @@ function renderDetails(tab, data) {
 
       permission.className = "permission";
 
-      let ruleHtml = "";
+      permission.innerHTML = `
 
-      ruleHtml += "<h4>" + (rule.resources || []).join(", ") + "</h4>";
+<h4>${(rule.resources || []).join(", ") || "*"}</h4>
 
-      (rule.verbs || []).forEach((v) => {
-        ruleHtml += "<span>" + v + "</span>";
-      });
+<p><b>API Groups:</b>
+${(rule.apiGroups || []).join(", ") || "-"}</p>
 
-      permission.innerHTML = ruleHtml;
+<p><b>Verbs:</b>
+${(rule.verbs || []).join(", ")}</p>
+
+`;
 
       permissionCard.appendChild(permission);
     });
 
     details.appendChild(permissionCard);
+  } else {
+    const empty = document.createElement("div");
+
+    empty.className = "card";
+
+    empty.innerHTML = "<h3>Permissions</h3><p>No permissions found.</p>";
+
+    details.appendChild(empty);
   }
 
   // ----------------------------------------------------
   // RoleBindings
   // ----------------------------------------------------
 
-  if (obj.roleBindings) {
+  if (obj.roleBindings && obj.roleBindings.length > 0) {
     const rb = document.createElement("div");
 
     rb.className = "card";
@@ -276,42 +310,55 @@ function renderDetails(tab, data) {
 
     obj.roleBindings.forEach((binding) => {
       rb.innerHTML += `
+
 <p>
+
 <b>${binding.name}</b><br>
+
 Namespace : ${binding.namespace}<br>
+
 Role : ${binding.role}
+
 </p>
+
 <hr>
+
 `;
     });
 
     details.appendChild(rb);
   }
-
-  // ----------------------------------------------------
-  // ClusterRoleBindings
-  // ----------------------------------------------------
-
-  if (obj.clusterRoleBindings) {
-    const crb = document.createElement("div");
-
-    crb.className = "card";
-
-    crb.innerHTML = "<h3>ClusterRoleBindings</h3>";
-
-    obj.clusterRoleBindings.forEach((binding) => {
-      crb.innerHTML += `
-<p>
-<b>${binding.name}</b><br>
-Role : ${binding.role}
-</p>
-<hr>
-`;
-    });
-
-    details.appendChild(crb);
-  }
 }
+// ----------------------------------------------------
+// ClusterRoleBindings
+// ----------------------------------------------------
+
+if (obj.clusterRoleBindings && obj.clusterRoleBindings.length > 0) {
+  const crb = document.createElement("div");
+
+  crb.className = "card";
+
+  crb.innerHTML = "<h3>ClusterRoleBindings</h3>";
+
+  obj.clusterRoleBindings.forEach((binding) => {
+    crb.innerHTML += `
+
+<p>
+
+<b>${binding.name}</b><br>
+
+Role : ${binding.role}
+
+</p>
+
+<hr>
+
+`;
+  });
+
+  details.appendChild(crb);
+}
+
 // ----------------------------------------------------
 // Graph
 // ----------------------------------------------------
@@ -319,14 +366,23 @@ Role : ${binding.role}
 function renderGraph(data) {
   destroyGraph();
 
-  graph = cy({
+  if (!data || !data.nodes || data.nodes.length === 0) {
+    document.getElementById("graph").innerHTML =
+      "<div style='padding:40px;text-align:center'>No relationship graph available.</div>";
+
+    return;
+  }
+
+  graph = cytoscape({
     container: document.getElementById("graph"),
 
     elements: [
       ...data.nodes.map((node) => ({
         data: {
           id: node.id,
+
           label: node.label,
+
           type: node.type,
         },
       })),
@@ -334,11 +390,11 @@ function renderGraph(data) {
       ...data.edges.map((edge) => ({
         data: {
           source: edge.source,
+
           target: edge.target,
         },
       })),
     ],
-
     style: [
       {
         selector: "node",
@@ -350,21 +406,25 @@ function renderGraph(data) {
 
           "text-halign": "center",
 
+          "text-wrap": "wrap",
+
+          "text-max-width": 120,
+
           color: "#ffffff",
 
-          "font-size": "12px",
+          "font-size": 12,
 
           "font-weight": "bold",
 
-          width: "55px",
+          width: 60,
 
-          height: "55px",
+          height: 60,
 
           "background-color": "#2563eb",
 
-          "text-wrap": "wrap",
+          "border-width": 2,
 
-          "text-max-width": "80px",
+          "border-color": "#ffffff",
         },
       },
 
@@ -412,9 +472,9 @@ function renderGraph(data) {
         selector: 'node[type="RoleBinding"]',
 
         style: {
-          "background-color": "#0891b2",
-
           shape: "round-rectangle",
+
+          "background-color": "#0891b2",
         },
       },
 
@@ -422,9 +482,9 @@ function renderGraph(data) {
         selector: 'node[type="ClusterRoleBinding"]',
 
         style: {
-          "background-color": "#be185d",
-
           shape: "round-rectangle",
+
+          "background-color": "#be185d",
         },
       },
 
@@ -452,7 +512,9 @@ function renderGraph(data) {
 
       padding: 40,
 
-      spacingFactor: 1.5,
+      spacingFactor: 1.7,
+
+      animate: true,
     },
   });
 
@@ -462,7 +524,6 @@ function renderGraph(data) {
 // ----------------------------------------------------
 // RoleBinding Details
 // ----------------------------------------------------
-
 function showRoleBinding(item) {
   destroyGraph();
 
@@ -478,7 +539,32 @@ function showRoleBinding(item) {
 
   html += "<p><b>Role:</b> " + item.role + "</p>";
 
+  html += "<p><b>Role Type:</b> " + item.kind + "</p>";
+
   html += "</div>";
+
+  if (item.permissions && item.permissions.length > 0) {
+    html += "<div class='card'>";
+
+    html += "<h3>Permissions</h3>";
+
+    item.permissions.forEach((rule) => {
+      html += "<div class='permission'>";
+
+      html += "<h4>" + ((rule.resources || []).join(", ") || "*") + "</h4>";
+
+      html +=
+        "<p><b>API Groups:</b> " +
+        ((rule.apiGroups || []).join(", ") || "-") +
+        "</p>";
+
+      html += "<p><b>Verbs:</b> " + (rule.verbs || []).join(", ") + "</p>";
+
+      html += "</div>";
+    });
+
+    html += "</div>";
+  }
 
   html += "<div class='card'>";
 
@@ -522,11 +608,34 @@ function showClusterRoleBinding(item) {
 
   html += "</div>";
 
+  if (item.permissions && item.permissions.length > 0) {
+    html += "<div class='card'>";
+
+    html += "<h3>Permissions</h3>";
+
+    item.permissions.forEach((rule) => {
+      html += "<div class='permission'>";
+
+      html += "<h4>" + ((rule.resources || []).join(", ") || "*") + "</h4>";
+
+      html +=
+        "<p><b>API Groups:</b> " +
+        ((rule.apiGroups || []).join(", ") || "-") +
+        "</p>";
+
+      html += "<p><b>Verbs:</b> " + (rule.verbs || []).join(", ") + "</p>";
+
+      html += "</div>";
+    });
+
+    html += "</div>";
+  }
+
   html += "<div class='card'>";
 
   html += "<h3>Subjects</h3>";
 
-  item.subjects.forEach((subject) => {
+  (item.subjects || []).forEach((subject) => {
     html += "<p>";
 
     html += "<b>" + subject.kind + "</b><br>";
