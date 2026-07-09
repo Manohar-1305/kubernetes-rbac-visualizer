@@ -29,7 +29,6 @@ rbac-analyzer/
 │   ├── main.py
 │   ├── k8s.py
 │   ├── graph.py
-│   ├── models.py
 │   └── requirements.txt
 │
 ├── frontend/
